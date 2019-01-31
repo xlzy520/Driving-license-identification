@@ -19,7 +19,7 @@ export default function getAccessToken() {
       res.on('data', (d) => {
         const data = d.toString();
         const dataJson = JSON.parse(data);
-        const accessToken = dataJson.accsee_token;
+        const accessToken = dataJson.access_token;
         sessionStorage.setItem('accessToken', accessToken);
         // fs.writeFile('./a.json', d, (err) => {
         //   if (err) {
