@@ -13,8 +13,9 @@
         </md-content>
       </md-card>
       <div class="driving-license-run" v-show="filePath.length>0">
-        <md-button class="md-raised md-primary" @click="run">开始识别并重命名</md-button>
+        <md-button class="md-raised md-primary" @click="run" v-show="!openResultDirButton">开始识别并重命名</md-button>
         <md-button class="md-raised md-accent" @click="reset">返回首页</md-button>
+        <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openResultDir" v-show="openResultDirButton" >打开完成结果目录</md-button>
       </div>
     </div>
     <div class="driving-license-select" v-show="filePath.length===0">
@@ -27,10 +28,13 @@
       <div v-for="img in images" class="img-item" @click="viewImg(img)">
         <img :src="filePath+'/'+ img" :title="img">
         <p>{{img}}</p>
-        <md-icon class="md-size-2x read_success">verified_user</md-icon>
+        <!--<md-icon class="md-size-2x read_success" v-show="">verified_user</md-icon>-->
         <md-progress-bar md-mode="indeterminate" v-show="img === currentImg"></md-progress-bar>
       </div>
     </div>
+    <md-dialog-alert
+        :md-active.sync="complete"
+        md-content="全部完成!"/>
   </div>
 </template>
 
@@ -47,6 +51,8 @@
         otherTypeCount: 0,
         allPeople: [],
         currentImg: '',
+        complete: false,
+        openResultDirButton: false,
       };
     },
     methods: {
@@ -72,6 +78,10 @@
         this.filePath = '';
         this.images = [];
         this.otherTypeCount = 0;
+        this.currentImg = '';
+        this.allPeople = [];
+        this.openResultDirButton = false;
+        this.complete = false;
       },
       run() {
         const accessToken = sessionStorage.getItem('accessToken');
@@ -94,8 +104,7 @@
         // this.rename(imagePath, imgExt, data);
         let i = 0;
         const renameTime = setInterval(() => {
-          console.log(this.images.length);
-          if (i < 2) {
+          if (i < this.images.length) {
             this.currentImg = this.images[i];
             const imgExt = this.images[i].substring(this.images[i].lastIndexOf('.'));
             const imagePath = `${this.filePath}/${this.images[i]}`;
@@ -106,14 +115,16 @@
               url: `/vehicle_license?access_token=${token}`,
               data: `image=${encodeURIComponent(imgBase64)}&detect_direction=true`,
             }).then((res) => {
-              console.log(res.data);
               if (res.data) {
                 this.allPeople.push(res.data);
                 this.rename(imagePath, imgExt, res.data);
               }
-              i += 1;
             });
+            i += 1;
           } else {
+            this.currentImg = '';
+            this.openResultDirButton = true;
+            this.complete = true;
             clearInterval(renameTime);
           }
         }, 1000);
@@ -128,12 +139,15 @@
         }
         if (ownerName.length > 0) {
           fs.access(`${basePath}${ownerName}${imgExt}`, fs.constants.F_OK, (err) => {
-            const resultName = err ? '' : `-重名${new Date().getMinutes()}:${new Date().getSeconds()}`;
+            const resultName = err ? '' : `-重名${new Date().getMinutes()}-${new Date().getSeconds()}`;
             fs.copyFileSync(imagePath, `${basePath}${ownerName}${resultName}${imgExt}`);
           });
         } else {
           throw new Error('识别失败！');
         }
+      },
+      openResultDir() {
+        shell.openItem(`${this.filePath}\\完成结果\\`);
       },
     },
   };
@@ -176,6 +190,7 @@
       height: 70vh;
       margin-top: 15px;
       .img-item{
+        position: relative;
         margin-left: 25px;
         width: 128px;
         cursor: pointer;
@@ -189,6 +204,9 @@
           bottom: 48px;
         }
         .read_success{
+          position: relative;
+          bottom: 221px;
+          left: 86px;
           color: #33ff9b;
         }
       }
