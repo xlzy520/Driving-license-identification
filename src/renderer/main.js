@@ -1,7 +1,7 @@
 import Vue from 'vue';
 import axios from 'axios';
 
-import { MdButton, MdContent, MdTabs, MdIcon, MdCard, MdDialogAlert, MdProgress} from 'vue-material/dist/components';
+import { MdButton, MdContent, MdTabs, MdIcon, MdCard, MdDialogAlert, MdDialog, MdProgress } from 'vue-material/dist/components';
 import 'vue-material/dist/vue-material.min.css';
 import 'vue-material/dist/theme/default.css';
 import '@/styles/index.scss';
@@ -18,6 +18,7 @@ Vue.use(MdIcon);
 Vue.use(MdCard);
 Vue.use(MdDialogAlert);
 Vue.use(MdProgress);
+Vue.use(MdDialog);
 
 if (!process.env.IS_WEB) Vue.use(require('vue-electron'));
 const service = axios.create({
