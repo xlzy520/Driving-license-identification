@@ -14,18 +14,14 @@ export default function getAccessToken() {
       path: `/oauth/2.0/token?${param}`,
     },
     (res) => {
-      // 在标准输出中查看运行结果
-      // res.pipe(process.stdout);
+      let data;
       res.on('data', (d) => {
-        const data = d.toString();
+        data = d.toString();
+      });
+      res.on('end', () => {
         const dataJson = JSON.parse(data);
         const accessToken = dataJson.access_token;
         sessionStorage.setItem('accessToken', accessToken);
-        // fs.writeFile('./a.json', d, (err) => {
-        //   if (err) {
-        //     throw err;
-        //   }
-        // });
       });
     },
   );
