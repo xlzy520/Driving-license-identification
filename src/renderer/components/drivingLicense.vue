@@ -1,21 +1,18 @@
 <template>
   <div class="driving-license">
-    <div class="driving-license-help">
+    <div class="driving-license-header">
       <div class="driving-license-fileDetail">
         <p>选择的文件夹路径：{{filePath}}</p>
         <p>图片数量：{{images.length}}</p>
         <p>其他文件类型数量：{{otherTypeCount}}</p>
+        <p v-show="errorImg.length>0">
+          识别失败的图片数量：{{errorImg.length}}
+          <md-button class="md-raised md-mini md-accent open-error-dir" @click="openDir('error')">打开失败文件夹</md-button></p>
       </div>
-      <md-card md-with-hover @click.native="hideHelp" v-show="helpVisible&&filePath.length===0">
-        <md-content>
-          批量识别行驶证图片，并将行驶证姓名重命名该图片。
-          请勿使用中文命名文件夹！
-        </md-content>
-      </md-card>
       <div class="driving-license-run" v-show="filePath.length>0">
         <md-button class="md-raised md-primary" @click="run" v-show="!openResultDirButton">开始识别并重命名</md-button>
         <md-button class="md-raised md-accent" @click="reset">返回首页</md-button>
-        <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openResultDir" v-show="openResultDirButton" >打开完成结果目录</md-button>
+        <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openDir('result')" v-show="openResultDirButton" >打开完成结果目录</md-button>
       </div>
     </div>
     <div class="driving-license-select" v-show="filePath.length===0">
@@ -25,11 +22,10 @@
       </md-button>
     </div>
     <div class="driving-license-content md-scrollbar"  v-show="filePath.length>0">
-      <div v-for="img in images" class="img-item" @click="viewImg(img)">
-        <img :src="filePath+'/'+ img" :title="img">
-        <p>{{img}}</p>
-        <!--<md-icon class="md-size-2x read_success" v-show="">verified_user</md-icon>-->
-        <md-progress-bar md-mode="indeterminate" v-show="img === currentImg"></md-progress-bar>
+      <div v-for="(img,index) in images" :class="['img-item', imgFlag(img)]" @click="viewImg(img)">
+        <img :src="filePath+'/'+ img.name" :title="img.name" width="64">
+        <p>{{img.name}}</p>
+        <md-progress-bar md-mode="indeterminate" v-show="index<progress && img.success=== null"></md-progress-bar>
       </div>
     </div>
     <md-dialog-alert
@@ -45,89 +41,104 @@
     name: 'driving-license',
     data() {
       return {
-        helpVisible: true,
         filePath: '',
         images: [],
         otherTypeCount: 0,
-        allPeople: [],
         currentImg: '',
         complete: false,
         openResultDirButton: false,
+        errorImg: [],
+        progress: 0,
       };
     },
     methods: {
+      imgFlag(img) {
+        if (img.success === true) {
+          return 'success-flag';
+        } else if (img.success === false) {
+          return 'failure-flag';
+        }
+        return '';
+      },
       openDirectory() {
         dialog.showOpenDialog({ properties: ['openDirectory'] }, (filePaths, err) => {
           if (err) throw err;
           this.filePath = filePaths[0];
           const files = fs.readdirSync(filePaths[0]);
-          this.images = this.hasOtherTypeFile(files);
+          this.images = this.filterImgFile(files);
           this.otherTypeCount = files.length - this.images.length;
         });
       },
-      hasOtherTypeFile(files) {
-        return files.filter(item => (/\.[jpg][png][jpeg]$/g).test(item));
-      },
-      hideHelp() {
-        this.helpVisible = false;
+      filterImgFile(files) {
+        const imgNames = files.filter(item => (/\.[jpg][png][jpeg]$/g).test(item));
+        return imgNames.map(item => ({ name: item, success: null }));
       },
       viewImg(img) {
-        shell.openItem(`${this.filePath}/${img}`);
+        shell.openItem(`${this.filePath}/${img.name}`);
       },
       reset() {
         this.filePath = '';
         this.images = [];
         this.otherTypeCount = 0;
         this.currentImg = '';
-        this.allPeople = [];
         this.openResultDirButton = false;
         this.complete = false;
       },
       run() {
         const accessToken = sessionStorage.getItem('accessToken');
+        const { length: max } = this.images;
         if (accessToken) {
-          this.postImg(accessToken);
+          this.progress = 1;
+          this.postImg(accessToken, 0, 1); // 直接进入loading，避免进入定时器而延迟
+          let i = 1;
+          const renameTime = setInterval(() => {
+            if (i < max) {
+              this.postImg(accessToken, i, max);
+              i += 1;
+              this.progress += 1;
+            } else {
+              this.currentImg = '';
+              clearInterval(renameTime);
+            }
+          }, 1200);
         }
       },
-      postImg(token) {
-        // const imgExt = this.images[i].substring(this.images[i].lastIndexOf('.'));
-        // const imagePath = `${this.filePath}\\${this.images[i]}`;
-        // const imageBuf = fs.readFileSync(imagePath);
-        // const imgBase64 = imageBuf.toString('base64');
-        // const data = {
-        //   words_result: {
-        //     所有人: {
-        //       words: '吕宗远',
-        //     },
-        //   },
-        // };
-        // this.rename(imagePath, imgExt, data);
-        let i = 0;
-        const renameTime = setInterval(() => {
-          if (i < this.images.length) {
-            this.currentImg = this.images[i];
-            const imgExt = this.images[i].substring(this.images[i].lastIndexOf('.'));
-            const imagePath = `${this.filePath}/${this.images[i]}`;
-            const imageBuf = fs.readFileSync(imagePath);
-            const imgBase64 = imageBuf.toString('base64');
-            this.$http({
-              method: 'post',
-              url: `/vehicle_license?access_token=${token}`,
-              data: `image=${encodeURIComponent(imgBase64)}&detect_direction=true`,
-            }).then((res) => {
-              if (res.data) {
-                this.allPeople.push(res.data);
-                this.rename(imagePath, imgExt, res.data);
+      postImg(token, i, max) {
+        const { name } = this.images[i];
+        this.currentImg = name;
+        const imgExt = name.substring(name.lastIndexOf('.'));
+        const imagePath = `${this.filePath}/${name}`;
+        const imageBuf = fs.readFileSync(imagePath);
+        const imgBase64 = imageBuf.toString('base64');
+        this.$http({
+          method: 'post',
+          url: `/vehicle_license?access_token=${token}`,
+          data: `image=${encodeURIComponent(imgBase64)}&detect_direction=true`,
+        })
+          .then((res) => {
+            const imgIndex = this.images.findIndex(item => item.name === name);
+            if (res.data.error_code) {
+              this.images[imgIndex].success = false;
+              this.errorImg.push(name);
+              this.copyErrImg(imagePath, name, imgExt);
+            } else {
+              this.images[imgIndex].success = true;
+              this.rename(imagePath, imgExt, res.data);
+              if (i === max - 1) {
+                this.openResultDirButton = true;
+                this.complete = true;
               }
-            });
-            i += 1;
-          } else {
-            this.currentImg = '';
-            this.openResultDirButton = true;
-            this.complete = true;
-            clearInterval(renameTime);
-          }
-        }, 1000);
+            }
+          });
+      },
+      copyErrImg(imagePath, imgName, imgExt) {
+        const basePath = `${this.filePath}\\识别失败\\`;
+        if (!fs.existsSync(basePath)) {
+          fs.mkdirSync(basePath, (err) => {
+            if (err) throw err;
+          });
+        }
+        fs.copyFileSync(imagePath, `${basePath}${imgName}${imgExt}`);
       },
       rename(imagePath, imgExt, data) {
         const ownerName = data.words_result['所有人'].words;
@@ -146,8 +157,17 @@
           throw new Error('识别失败！');
         }
       },
-      openResultDir() {
-        shell.openItem(`${this.filePath}\\完成结果\\`);
+      openDir(flag) {
+        switch (flag) {
+          case 'result':
+            shell.openItem(`${this.filePath}\\完成结果\\`);
+            break;
+          case 'error':
+            shell.openItem(`${this.filePath}\\识别失败\\`);
+            break;
+          default:
+            break;
+        }
       },
     },
   };
@@ -175,8 +195,17 @@
     }
     &-fileDetail{
       color: #ff008b;
+      p{
+        padding-bottom: 5px;
+      }
+      .open-error-dir{
+        line-height: 25px;
+        height: 25px;
+        vertical-align: middle;
+        margin: 0;
+      }
     }
-    &-help{
+    &-header{
       display: flex;
       justify-content: space-between;
       width: 100%;
@@ -191,17 +220,46 @@
       margin-top: 15px;
       .img-item{
         position: relative;
-        margin-left: 25px;
-        width: 128px;
+        margin-left: 27px;
+        width: 64px;
         cursor: pointer;
+        img{
+          height: 85.33px;
+        }
+        &::before{
+          content: "";
+          display: block;
+          position: relative;
+          top: 13px;
+          left: 50px;
+          border-radius: 50%;
+          font-size: 20px;
+          width: 24px;
+          height: 24px;
+          line-height: 24px;
+          text-indent: 5px;
+        }
+        &.success-flag::before, &.failure-flag::before{
+          background-color: #fff;
+        }
+        &.success-flag::before{
+          content: "√";
+          color: limegreen;
+          border: 1px solid #65ad74;
+        }
+        &.failure-flag::before{
+          content: "X";
+          color: #ff3e31;
+          border: 1px solid #ff5d54;
+        }
         p{
-          width: 128px;
+          width: 64px;
           text-overflow: ellipsis;
           white-space: nowrap;
           overflow: hidden;
         }
         .md-progress-bar{
-          bottom: 48px;
+          bottom: 25px;
         }
         .read_success{
           position: relative;
