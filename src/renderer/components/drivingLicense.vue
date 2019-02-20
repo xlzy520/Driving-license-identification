@@ -10,9 +10,9 @@
           <md-button class="md-raised md-mini md-accent open-error-dir" @click="openDir('error')">打开失败文件夹</md-button></p>
       </div>
       <div class="driving-license-run" v-show="filePath.length>0">
-        <md-button class="md-raised md-primary" @click="run" v-show="!openResultDirButton">开始识别并重命名</md-button>
+        <md-button class="md-raised md-primary" @click="run" v-show="!complete">开始识别并重命名</md-button>
         <md-button class="md-raised md-accent" @click="reset">返回首页</md-button>
-        <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openDir('result')" v-show="openResultDirButton" >打开完成结果目录</md-button>
+        <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openDir('result')" v-show="complete" >打开完成结果目录</md-button>
       </div>
     </div>
     <div class="driving-license-select" v-show="filePath.length===0">
@@ -30,7 +30,7 @@
     </div>
     <md-dialog-alert
         :md-active.sync="complete"
-        md-content="全部完成!"/>
+        :md-content="'全部完成!'+errorImg.length+'个错误'"/>
   </div>
 </template>
 
@@ -44,9 +44,7 @@
         filePath: '',
         images: [],
         otherTypeCount: 0,
-        currentImg: '',
         complete: false,
-        openResultDirButton: false,
         errorImg: [],
         progress: 0,
       };
@@ -80,8 +78,6 @@
         this.filePath = '';
         this.images = [];
         this.otherTypeCount = 0;
-        this.currentImg = '';
-        this.openResultDirButton = false;
         this.complete = false;
       },
       run() {
@@ -93,19 +89,17 @@
           let i = 1;
           const renameTime = setInterval(() => {
             if (i < max) {
-              this.postImg(accessToken, i, max);
+              this.postImg(accessToken, i);
               i += 1;
               this.progress += 1;
             } else {
-              this.currentImg = '';
               clearInterval(renameTime);
             }
           }, 1200);
         }
       },
-      postImg(token, i, max) {
+      postImg(token, i) {
         const { name } = this.images[i];
-        this.currentImg = name;
         const imgExt = name.substring(name.lastIndexOf('.'));
         const imagePath = `${this.filePath}/${name}`;
         const imageBuf = fs.readFileSync(imagePath);
@@ -124,8 +118,7 @@
             } else {
               this.images[imgIndex].success = true;
               this.rename(imagePath, imgExt, res.data);
-              if (i === max - 1) {
-                this.openResultDirButton = true;
+              if (i === this.images.length + 1) {
                 this.complete = true;
               }
             }
