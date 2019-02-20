@@ -10,16 +10,16 @@
           识别失败的图片数量：{{errorImg.length}}
           <md-button class="md-raised md-mini md-accent open-error-dir" @click="openDir('error')">打开失败文件夹</md-button></p>
       </div>
-      <div class="driving-license-run" v-show="filePath.length>0">
-        <md-button class="md-raised md-primary" @click="run">
+      <div class="driving-license-run" v-show="filePath.length>0" >
+        <md-button class="md-raised md-primary" @click="run" v-show="!complete">
           <md-progress-spinner
-              v-show="!complete"
+              v-show="reading"
               md-mode="indeterminate"
               class="md-primary md-light-green"
               style="vertical-align: middle"
               :md-diameter="20"
               :md-stroke="2"></md-progress-spinner>
-          {{runText}}
+          {{reading?'正在识别并重命名':'开始识别并重命名'}}
         </md-button>
         <md-button class="md-raised md-accent" @click="init">返回首页</md-button>
         <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openDir('result')" v-show="complete" >打开完成结果目录</md-button>
@@ -62,11 +62,9 @@
       };
     },
     computed: {
-      runText() {
-        if (this.complete && this.imgCompletedCount < this.images.length) {
-          return '正在识别并重命名';
-        }
-        return '开始识别并重命名';
+      reading() {
+        return !this.complete && this.imgCompletedCount < this.images.length
+            && this.intervalProgress > 0;
       },
     },
     methods: {
