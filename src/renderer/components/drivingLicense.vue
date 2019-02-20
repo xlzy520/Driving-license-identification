@@ -11,7 +11,7 @@
       </div>
       <div class="driving-license-run" v-show="filePath.length>0">
         <md-button class="md-raised md-primary" @click="run" v-show="!complete">开始识别并重命名</md-button>
-        <md-button class="md-raised md-accent" @click="reset">返回首页</md-button>
+        <md-button class="md-raised md-accent" @click="init">返回首页</md-button>
         <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openDir('result')" v-show="complete" >打开完成结果目录</md-button>
       </div>
     </div>
@@ -21,15 +21,15 @@
         <div class="tips">请选择文件夹</div>
       </md-button>
     </div>
-    <div class="driving-license-content md-scrollbar"  v-show="filePath.length>0">
+    <div class="driving-license-content md-scrollbar" v-show="filePath.length>0" ref="driving">
       <div v-for="(img,index) in images" :class="['img-item', imgFlag(img)]" @click="viewImg(img)">
         <img :src="filePath+'/'+ img.name" :title="img.name" width="64">
         <p>{{img.name}}</p>
-        <md-progress-bar md-mode="indeterminate" v-show="index<progress && img.success=== null"></md-progress-bar>
+        <md-progress-bar md-mode="indeterminate" v-show="index<intervalProgress && img.success=== null"></md-progress-bar>
       </div>
     </div>
     <md-dialog-alert
-        :md-active.sync="complete"
+        :md-active.sync="completeDialog"
         :md-content="'全部完成!'+errorImg.length+'个错误'"/>
   </div>
 </template>
@@ -45,8 +45,10 @@
         images: [],
         otherTypeCount: 0,
         complete: false,
+        completeDialog: false,
         errorImg: [],
-        progress: 0,
+        intervalProgress: 0,
+        imgCompletedCount: 0,
       };
     },
     methods: {
@@ -74,24 +76,26 @@
       viewImg(img) {
         shell.openItem(`${this.filePath}/${img.name}`);
       },
-      reset() {
+      init() {
         this.filePath = '';
         this.images = [];
+        this.errorImg = [];
         this.otherTypeCount = 0;
         this.complete = false;
+        this.intervalProgress = 0;
       },
       run() {
         const accessToken = sessionStorage.getItem('accessToken');
         const { length: max } = this.images;
         if (accessToken) {
-          this.progress = 1;
-          this.postImg(accessToken, 0, 1); // 直接进入loading，避免进入定时器而延迟
+          this.intervalProgress = 1;
+          this.postImg(accessToken, 0); // 直接进入loading，避免进入定时器而延迟
           let i = 1;
           const renameTime = setInterval(() => {
             if (i < max) {
               this.postImg(accessToken, i);
               i += 1;
-              this.progress += 1;
+              this.intervalProgress += 1;
             } else {
               clearInterval(renameTime);
             }
@@ -111,16 +115,21 @@
         })
           .then((res) => {
             const imgIndex = this.images.findIndex(item => item.name === name);
-            if (res.data.error_code) {
+            if (res.data.error_code || !res.data.words_result['所有人'].words === '') {
               this.images[imgIndex].success = false;
               this.errorImg.push(name);
               this.copyErrImg(imagePath, name, imgExt);
             } else {
               this.images[imgIndex].success = true;
               this.rename(imagePath, imgExt, res.data);
-              if (i === this.images.length + 1) {
-                this.complete = true;
-              }
+            }
+            this.imgCompletedCount += 1; // 判断全部图片识别完成的标志
+            if (this.imgCompletedCount % 10 === 0) {
+              this.$refs.driving.scrollTop += 129;
+            }
+            if (this.imgCompletedCount === this.images.length) {
+              this.complete = true;
+              this.completeDialog = true;
             }
           });
       },
