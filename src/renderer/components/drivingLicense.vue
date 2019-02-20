@@ -5,12 +5,22 @@
         <p>选择的文件夹路径：{{filePath}}</p>
         <p>图片数量：{{images.length}}</p>
         <p>其他文件类型数量：{{otherTypeCount}}</p>
+        <p>识别完成的图片数量：{{imgCompletedCount}}</p>
         <p v-show="errorImg.length>0">
           识别失败的图片数量：{{errorImg.length}}
           <md-button class="md-raised md-mini md-accent open-error-dir" @click="openDir('error')">打开失败文件夹</md-button></p>
       </div>
       <div class="driving-license-run" v-show="filePath.length>0">
-        <md-button class="md-raised md-primary" @click="run" v-show="!complete">开始识别并重命名</md-button>
+        <md-button class="md-raised md-primary" @click="run">
+          <md-progress-spinner
+              v-show="!complete"
+              md-mode="indeterminate"
+              class="md-primary md-light-green"
+              style="vertical-align: middle"
+              :md-diameter="20"
+              :md-stroke="2"></md-progress-spinner>
+          {{runText}}
+        </md-button>
         <md-button class="md-raised md-accent" @click="init">返回首页</md-button>
         <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openDir('result')" v-show="complete" >打开完成结果目录</md-button>
       </div>
@@ -51,6 +61,14 @@
         imgCompletedCount: 0,
       };
     },
+    computed: {
+      runText() {
+        if (this.complete && this.imgCompletedCount < this.images.length) {
+          return '正在识别并重命名';
+        }
+        return '开始识别并重命名';
+      },
+    },
     methods: {
       imgFlag(img) {
         if (img.success === true) {
@@ -85,21 +103,23 @@
         this.intervalProgress = 0;
       },
       run() {
-        const accessToken = sessionStorage.getItem('accessToken');
-        const { length: max } = this.images;
-        if (accessToken) {
-          this.intervalProgress = 1;
-          this.postImg(accessToken, 0); // 直接进入loading，避免进入定时器而延迟
-          let i = 1;
-          const renameTime = setInterval(() => {
-            if (i < max) {
-              this.postImg(accessToken, i);
-              i += 1;
-              this.intervalProgress += 1;
-            } else {
-              clearInterval(renameTime);
-            }
-          }, 1200);
+        if (this.intervalProgress === 0) {
+          const accessToken = sessionStorage.getItem('accessToken');
+          const { length: max } = this.images;
+          if (accessToken) {
+            this.intervalProgress = 1;
+            this.postImg(accessToken, 0); // 直接进入loading，避免进入定时器而延迟
+            let i = 1;
+            const renameTime = setInterval(() => {
+              if (i < max) {
+                this.postImg(accessToken, i);
+                i += 1;
+                this.intervalProgress += 1;
+              } else {
+                clearInterval(renameTime);
+              }
+            }, 1200);
+          }
         }
       },
       postImg(token, i) {
@@ -276,5 +296,10 @@
       padding: 15px 10px 0;
       border-radius: 4px;
     }
+  }
+</style>
+<style lang="scss" scoped>
+  /deep/ .md-progress-spinner.md-theme-default .md-progress-spinner-circle {
+    stroke: #10ff19;
   }
 </style>
