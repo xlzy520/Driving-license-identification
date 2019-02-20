@@ -14,9 +14,9 @@ export default function getAccessToken() {
       path: `/oauth/2.0/token?${param}`,
     },
     (res) => {
-      let data;
+      let data = '';
       res.on('data', (d) => {
-        data = d.toString();
+        data += d.toString();
       });
       res.on('end', () => {
         const dataJson = JSON.parse(data);
