@@ -21,7 +21,7 @@
               :md-stroke="2"></md-progress-spinner>
           {{reading?'正在识别并重命名':'开始识别并重命名'}}
         </md-button>
-        <md-button class="md-raised md-accent" @click="init">返回首页</md-button>
+        <md-button class="md-raised md-accent" @click="init">重新选择文件夹</md-button>
         <md-button class="md-raised md-accent" style="background-color: #24c121" @click="openDir('result')" v-show="complete" >打开完成结果目录</md-button>
       </div>
     </div>
@@ -99,6 +99,7 @@
         this.otherTypeCount = 0;
         this.complete = false;
         this.intervalProgress = 0;
+        this.imgCompletedCount = 0;
       },
       run() {
         if (this.intervalProgress === 0) {
@@ -133,7 +134,7 @@
         })
           .then((res) => {
             const imgIndex = this.images.findIndex(item => item.name === name);
-            if (res.data.error_code || !res.data.words_result['所有人'].words === '') {
+            if (res.data.error_code || res.data.words_result['所有人'].words === '') {
               this.images[imgIndex].success = false;
               this.errorImg.push(name);
               this.copyErrImg(imagePath, name, imgExt);
